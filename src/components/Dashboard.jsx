@@ -1,619 +1,347 @@
-import { useState } from "react";
+
+import { useEffect, useState } from "react";
 
 import TransactionForm from "./TransactionForm";
 import History from "./History";
 import Reports from "./Reports";
 
-function Dashboard({ username, onLogout }) {
-  const [activeSection, setActiveSection] = useState("inicio");
+// Movimientos de ejemplo para la primera ejecución.
+const INITIAL_TRANSACTIONS = [
+  {
+    id: 1,
+    type: "income",
+    description: "Salario",
+    amount: 2500000,
+    category: "Salario",
+    date: "2026-09-01",
+  },
+  {
+    id: 2,
+    type: "income",
+    description: "Trabajo freelance",
+    amount: 800000,
+    category: "Freelance",
+    date: "2026-09-05",
+  },
+  {
+    id: 3,
+    type: "expense",
+    description: "Supermercado",
+    amount: 350000,
+    category: "Alimentación",
+    date: "2026-09-03",
+  },
+];
 
-  // ==========================================
-  // TRANSACCIONES
-  // ==========================================
+const STORAGE_KEY = "misIngresosTransactions";
 
-  const [transactions, setTransactions] = useState(() => {
-    const savedTransactions = localStorage.getItem(
-      "misIngresosTransactions"
-    );
+// Recupera los movimientos guardados en el navegador.
+function loadTransactions() {
+  try {
+    const savedData = localStorage.getItem(STORAGE_KEY);
 
-    if (savedTransactions) {
-      return JSON.parse(savedTransactions);
+    if (savedData === null) {
+      return INITIAL_TRANSACTIONS;
     }
 
-    return [
-      {
-        id: 1,
-        type: "income",
-        description: "Salario",
-        amount: 2500000,
-        category: "Salario",
-        date: "2026-09-01",
-      },
+    const parsedData = JSON.parse(savedData);
 
-      {
-        id: 2,
-        type: "income",
-        description: "Trabajo freelance",
-        amount: 800000,
-        category: "Freelance",
-        date: "2026-09-05",
-      },
+    if (!Array.isArray(parsedData)) {
+      console.error("El historial guardado no tiene un formato válido.");
+      return INITIAL_TRANSACTIONS;
+    }
 
-      {
-        id: 3,
-        type: "expense",
-        description: "Supermercado",
-        amount: 350000,
-        category: "Alimentación",
-        date: "2026-09-03",
-      },
-    ];
-  });
+    return parsedData;
+  } catch (error) {
+    console.error("No se pudieron recuperar los movimientos:", error);
+    return INITIAL_TRANSACTIONS;
+  }
+}
 
-  // ==========================================
-  // AGREGAR TRANSACCIÓN
-  // ==========================================
+// Guarda el historial en el almacenamiento local.
+function saveTransactions(transactions) {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(transactions));
+  } catch (error) {
+    console.error("No se pudieron guardar los movimientos:", error);
+  }
+}
 
+function Dashboard({ username, onLogout }) {
+  const [activeSection, setActiveSection] = useState("inicio");
+  const [transactions, setTransactions] = useState(loadTransactions);
+
+  // Guarda los cambios del historial cuando se actualizan.
+  useEffect(() => {
+    saveTransactions(transactions);
+  }, [transactions]);
+
+  // Añade un movimiento al historial.
   const addTransaction = (transaction) => {
-    setTransactions((current) => {
-      const updatedTransactions = [
-        ...current,
-        transaction,
-      ];
-
-      localStorage.setItem(
-        "misIngresosTransactions",
-        JSON.stringify(updatedTransactions)
-      );
-
-      return updatedTransactions;
-    });
-
+    setTransactions((current) => [...current, transaction]);
     setActiveSection("inicio");
   };
 
-  // ==========================================
-  // ELIMINAR TRANSACCIÓN
-  // ==========================================
-
+  // Elimina un movimiento según su identificador.
   const deleteTransaction = (id) => {
-    setTransactions((current) => {
-      const updatedTransactions = current.filter(
-        (transaction) => transaction.id !== id
-      );
-
-      localStorage.setItem(
-        "misIngresosTransactions",
-        JSON.stringify(updatedTransactions)
-      );
-
-      return updatedTransactions;
-    });
+    setTransactions((current) =>
+      current.filter((transaction) => transaction.id !== id)
+    );
   };
 
-  // ==========================================
-  // TOTAL INGRESOS
-  // ==========================================
-
+  // Calcula el total de ingresos.
   const totalIngresos = transactions
-    .filter(
-      (transaction) =>
-        transaction.type === "income"
-    )
-    .reduce(
-      (total, transaction) =>
-        total + transaction.amount,
-      0
-    );
+    .filter((transaction) => transaction.type === "income")
+    .reduce((total, transaction) => total + Number(transaction.amount), 0);
 
-  // ==========================================
-  // TOTAL GASTOS
-  // ==========================================
-
+  // Calcula el total de gastos.
   const totalGastos = transactions
-    .filter(
-      (transaction) =>
-        transaction.type === "expense"
-    )
-    .reduce(
-      (total, transaction) =>
-        total + transaction.amount,
-      0
-    );
+    .filter((transaction) => transaction.type === "expense")
+    .reduce((total, transaction) => total + Number(transaction.amount), 0);
 
-  // ==========================================
-  // BALANCE
-  // ==========================================
-
+  // Calcula el balance neto.
   const balance = totalIngresos - totalGastos;
 
-  // ==========================================
-  // FORMATO DE MONEDA
-  // ==========================================
+  // Presenta los valores en pesos colombianos.
+  const formatCurrency = (value) =>
+    new Intl.NumberFormat("es-CO", {
+      style: "currency",
+      currency: "COP",
+      maximumFractionDigits: 0,
+    }).format(value);
 
-  const formatCurrency = (value) => {
-    return `$${value.toLocaleString("es-CO")}`;
-  };
-
-  // ==========================================
-  // INTERFAZ
-  // ==========================================
+  // Botón reutilizable para navegar por las secciones.
+  const navigationButton = (section, label, icon, color) => (
+    <div className="col" key={section}>
+      <button
+        type="button"
+        className={`btn w-100 ${
+          activeSection === section
+            ? `btn-${color}`
+            : `btn-outline-${color}`
+        }`}
+        onClick={() => setActiveSection(section)}
+      >
+        <i className={`fas ${icon} me-2`} />
+        {label}
+      </button>
+    </div>
+  );
 
   return (
     <div className="min-vh-100 bg-light">
-
-      {/* ======================================
-          BARRA SUPERIOR
-      ====================================== */}
-
+      {/* Barra superior */}
       <nav className="navbar navbar-dark bg-primary shadow">
-
         <div className="container">
-
           <span className="navbar-brand fw-bold">
-
-            <i className="fas fa-chart-line me-2"></i>
-
+            <i className="fas fa-chart-line me-2" />
             Mis Ingresos
-
           </span>
 
           <div className="d-flex align-items-center gap-3">
-
             <span className="text-white">
-
-              <i className="fas fa-user me-2"></i>
-
+              <i className="fas fa-user me-2" />
               {username}
-
             </span>
 
             <button
+              type="button"
               className="btn btn-outline-light btn-sm"
               onClick={onLogout}
             >
-
-              <i className="fas fa-sign-out-alt me-1"></i>
-
-              Cerrar Sesión
-
+              <i className="fas fa-sign-out-alt me-1" />
+              Cerrar sesión
             </button>
-
           </div>
-
         </div>
-
       </nav>
 
-      {/* ======================================
-          CONTENIDO PRINCIPAL
-      ====================================== */}
-
+      {/* Contenido principal */}
       <main className="container py-4">
-
-        {/* BIENVENIDA */}
-
         <div className="mb-4">
-
-          <h2 className="fw-bold">
-
-            ¡Bienvenido, {username}! 👋
-
-          </h2>
-
+          <h2 className="fw-bold">¡Bienvenido, {username}! 👋</h2>
           <p className="text-muted mb-0">
-
             Administra y controla tus finanzas personales.
-
           </p>
-
         </div>
 
-        {/* ======================================
-            MENÚ PRINCIPAL
-        ====================================== */}
-
+        {/* Menú de navegación */}
         <div className="card mb-4">
-
           <div className="card-body">
-
             <div className="row g-2">
-
-              {/* INICIO */}
-
-              <div className="col">
-
-                <button
-                  className={`btn w-100 ${
-                    activeSection === "inicio"
-                      ? "btn-primary"
-                      : "btn-outline-primary"
-                  }`}
-                  onClick={() =>
-                    setActiveSection("inicio")
-                  }
-                >
-
-                  <i className="fas fa-home me-2"></i>
-
-                  Inicio
-
-                </button>
-
-              </div>
-
-              {/* INGRESOS */}
-
-              <div className="col">
-
-                <button
-                  className={`btn w-100 ${
-                    activeSection === "ingresos"
-                      ? "btn-success"
-                      : "btn-outline-success"
-                  }`}
-                  onClick={() =>
-                    setActiveSection("ingresos")
-                  }
-                >
-
-                  <i className="fas fa-plus-circle me-2"></i>
-
-                  Registrar Ingreso
-
-                </button>
-
-              </div>
-
-              {/* GASTOS */}
-
-              <div className="col">
-
-                <button
-                  className={`btn w-100 ${
-                    activeSection === "gastos"
-                      ? "btn-danger"
-                      : "btn-outline-danger"
-                  }`}
-                  onClick={() =>
-                    setActiveSection("gastos")
-                  }
-                >
-
-                  <i className="fas fa-minus-circle me-2"></i>
-
-                  Registrar Gasto
-
-                </button>
-
-              </div>
-
-              {/* HISTORIAL */}
-
-              <div className="col">
-
-                <button
-                  className={`btn w-100 ${
-                    activeSection === "historial"
-                      ? "btn-dark"
-                      : "btn-outline-dark"
-                  }`}
-                  onClick={() =>
-                    setActiveSection("historial")
-                  }
-                >
-
-                  <i className="fas fa-history me-2"></i>
-
-                  Historial
-
-                </button>
-
-              </div>
-
-              {/* REPORTES */}
-
-              <div className="col">
-
-                <button
-                  className={`btn w-100 ${
-                    activeSection === "reportes"
-                      ? "btn-warning"
-                      : "btn-outline-warning"
-                  }`}
-                  onClick={() =>
-                    setActiveSection("reportes")
-                  }
-                >
-
-                  <i className="fas fa-chart-pie me-2"></i>
-
-                  Reportes
-
-                </button>
-
-              </div>
-
+              {navigationButton("inicio", "Inicio", "fa-home", "primary")}
+              {navigationButton(
+                "ingresos",
+                "Registrar ingreso",
+                "fa-plus-circle",
+                "success"
+              )}
+              {navigationButton(
+                "gastos",
+                "Registrar gasto",
+                "fa-minus-circle",
+                "danger"
+              )}
+              {navigationButton(
+                "historial",
+                "Historial",
+                "fa-history",
+                "dark"
+              )}
+              {navigationButton(
+                "reportes",
+                "Reportes",
+                "fa-chart-pie",
+                "warning"
+              )}
             </div>
-
           </div>
-
         </div>
 
-        {/* ======================================
-            INICIO
-        ====================================== */}
-
+        {/* Página de inicio */}
         {activeSection === "inicio" && (
           <>
-
-            {/* TARJETAS */}
-
             <div className="row g-4 mb-4">
-
-              {/* INGRESOS */}
-
+              {/* Total de ingresos */}
               <div className="col-md-4">
-
                 <div className="card h-100 border-start border-success border-5">
-
                   <div className="card-body">
-
                     <div className="d-flex justify-content-between">
-
                       <div>
-
-                        <p className="text-muted mb-1">
-                          Total Ingresos
-                        </p>
-
+                        <p className="text-muted mb-1">Total ingresos</p>
                         <h3 className="fw-bold text-success">
-
-                          {formatCurrency(
-                            totalIngresos
-                          )}
-
+                          {formatCurrency(totalIngresos)}
                         </h3>
-
                       </div>
-
                       <div className="fs-1 text-success">
-
-                        <i className="fas fa-arrow-up"></i>
-
+                        <i className="fas fa-arrow-up" />
                       </div>
-
                     </div>
-
                   </div>
-
                 </div>
-
               </div>
 
-              {/* GASTOS */}
-
+              {/* Total de gastos */}
               <div className="col-md-4">
-
                 <div className="card h-100 border-start border-danger border-5">
-
                   <div className="card-body">
-
                     <div className="d-flex justify-content-between">
-
                       <div>
-
-                        <p className="text-muted mb-1">
-                          Total Gastos
-                        </p>
-
+                        <p className="text-muted mb-1">Total gastos</p>
                         <h3 className="fw-bold text-danger">
-
-                          {formatCurrency(
-                            totalGastos
-                          )}
-
+                          {formatCurrency(totalGastos)}
                         </h3>
-
                       </div>
-
                       <div className="fs-1 text-danger">
-
-                        <i className="fas fa-arrow-down"></i>
-
+                        <i className="fas fa-arrow-down" />
                       </div>
-
                     </div>
-
                   </div>
-
                 </div>
-
               </div>
 
-              {/* BALANCE */}
-
+              {/* Balance neto */}
               <div className="col-md-4">
-
                 <div className="card h-100 border-start border-primary border-5">
-
                   <div className="card-body">
-
                     <div className="d-flex justify-content-between">
-
                       <div>
-
-                        <p className="text-muted mb-1">
-                          Balance Neto
-                        </p>
-
+                        <p className="text-muted mb-1">Balance neto</p>
                         <h3 className="fw-bold text-primary">
-
-                          {formatCurrency(
-                            balance
-                          )}
-
+                          {formatCurrency(balance)}
                         </h3>
-
                       </div>
-
                       <div className="fs-1 text-primary">
-
-                        <i className="fas fa-wallet"></i>
-
+                        <i className="fas fa-wallet" />
                       </div>
-
                     </div>
-
                   </div>
-
                 </div>
-
               </div>
-
             </div>
 
-            {/* ACCIONES RÁPIDAS */}
-
+            {/* Acciones rápidas */}
             <div className="card">
-
               <div className="card-body">
-
                 <h4 className="fw-bold mb-4">
-
-                  <i className="fas fa-bolt me-2"></i>
-
+                  <i className="fas fa-bolt me-2" />
                   Acciones rápidas
-
                 </h4>
 
                 <div className="row g-3">
-
                   <div className="col-md-4">
-
                     <button
+                      type="button"
                       className="btn btn-success btn-lg w-100"
-                      onClick={() =>
-                        setActiveSection("ingresos")
-                      }
+                      onClick={() => setActiveSection("ingresos")}
                     >
-
-                      <i className="fas fa-money-bill-wave me-2"></i>
-
-                      Registrar Ingreso
-
+                      <i className="fas fa-money-bill-wave me-2" />
+                      Registrar ingreso
                     </button>
-
                   </div>
 
                   <div className="col-md-4">
-
                     <button
+                      type="button"
                       className="btn btn-danger btn-lg w-100"
-                      onClick={() =>
-                        setActiveSection("gastos")
-                      }
+                      onClick={() => setActiveSection("gastos")}
                     >
-
-                      <i className="fas fa-shopping-cart me-2"></i>
-
-                      Registrar Gasto
-
+                      <i className="fas fa-shopping-cart me-2" />
+                      Registrar gasto
                     </button>
-
                   </div>
 
                   <div className="col-md-4">
-
                     <button
+                      type="button"
                       className="btn btn-dark btn-lg w-100"
-                      onClick={() =>
-                        setActiveSection("historial")
-                      }
+                      onClick={() => setActiveSection("historial")}
                     >
-
-                      <i className="fas fa-list me-2"></i>
-
-                      Ver Historial
-
+                      <i className="fas fa-list me-2" />
+                      Ver historial
                     </button>
-
                   </div>
-
                 </div>
-
               </div>
-
             </div>
-
           </>
         )}
 
-        {/* ======================================
-            REGISTRAR INGRESO
-        ====================================== */}
-
+        {/* Formulario para registrar ingresos */}
         {activeSection === "ingresos" && (
-
           <TransactionForm
             type="income"
             onAddTransaction={addTransaction}
-            onBack={() =>
-              setActiveSection("inicio")
-            }
+            onBack={() => setActiveSection("inicio")}
           />
-
         )}
 
-        {/* ======================================
-            REGISTRAR GASTO
-        ====================================== */}
-
+        {/* Formulario para registrar gastos */}
         {activeSection === "gastos" && (
-
           <TransactionForm
             type="expense"
             onAddTransaction={addTransaction}
-            onBack={() =>
-              setActiveSection("inicio")
-            }
+            onBack={() => setActiveSection("inicio")}
           />
-
         )}
 
-        {/* ======================================
-            HISTORIAL
-        ====================================== */}
-
+        {/* Historial de movimientos */}
         {activeSection === "historial" && (
-
           <History
             transactions={transactions}
             onDeleteTransaction={deleteTransaction}
-            onBack={() =>
-              setActiveSection("inicio")
-            }
+            onBack={() => setActiveSection("inicio")}
           />
-
         )}
 
-        {/* ======================================
-            REPORTES
-        ====================================== */}
-
+        {/* Reportes financieros */}
         {activeSection === "reportes" && (
-
           <Reports
             transactions={transactions}
-            onBack={() =>
-              setActiveSection("inicio")
-            }
+            onBack={() => setActiveSection("inicio")}
           />
-
         )}
-
       </main>
-
     </div>
   );
 }

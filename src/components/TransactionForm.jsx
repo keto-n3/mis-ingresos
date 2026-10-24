@@ -1,11 +1,21 @@
 import { useState } from "react";
 
+/**
+ * Formulario para registrar ingresos y gastos.
+ *
+ * Props:
+ * - type: tipo de movimiento ("income" o "expense").
+ * - onAddTransaction: función que guarda el movimiento.
+ * - onBack: función para regresar al panel principal.
+ */
 function TransactionForm({ type, onAddTransaction, onBack }) {
   const [description, setDescription] = useState("");
   const [category, setCategory] = useState("");
   const [amount, setAmount] = useState("");
   const [date, setDate] = useState("");
+  const [error, setError] = useState("");
 
+  // Categorías disponibles para cada tipo de movimiento.
   const incomeCategories = [
     "Salario",
     "Freelance",
@@ -25,40 +35,68 @@ function TransactionForm({ type, onAddTransaction, onBack }) {
     "Otros",
   ];
 
-  const categories =
-    type === "income" ? incomeCategories : expenseCategories;
+  const isIncome = type === "income";
+  const isExpense = type === "expense";
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
+  const categories = isIncome
+    ? incomeCategories
+    : expenseCategories;
 
-    if (!description || !category || !amount || !date) {
-      alert("⚠️ Por favor completa todos los campos.");
+  // Comprueba los datos antes de registrar el movimiento.
+  const handleSubmit = (event) => {
+    event.preventDefault();
+    setError("");
+
+    if (!isIncome && !isExpense) {
+      setError("El tipo de movimiento no es válido.");
       return;
     }
 
+    if (
+      !description.trim() ||
+      !category ||
+      !amount ||
+      !date
+    ) {
+      setError("Completa todos los campos del formulario.");
+      return;
+    }
+
+    const numericAmount = Number(amount);
+
+    if (!Number.isFinite(numericAmount) || numericAmount <= 0) {
+      setError("Ingresa un valor numérico mayor que cero.");
+      return;
+    }
+
+    if (!categories.includes(category)) {
+      setError("Selecciona una categoría válida.");
+      return;
+    }
+
+    // Construye el objeto que utilizará el resto de la aplicación.
     const newTransaction = {
-      id: Date.now(),
-      type: type,
-      description: description,
-      amount: Number(amount),
-      category: category,
-      date: date,
+      id: crypto.randomUUID(),
+      type,
+      description: description.trim(),
+      amount: numericAmount,
+      category,
+      date,
     };
 
+    // Envía el movimiento al componente que administra los datos.
     onAddTransaction(newTransaction);
 
+    // Limpia el formulario después del registro.
     setDescription("");
     setCategory("");
     setAmount("");
     setDate("");
   };
 
-  const isIncome = type === "income";
-
   return (
-    <div className="card">
+    <div className="card shadow-sm">
       <div className="card-body p-4">
-
         <h3
           className={`fw-bold mb-4 ${
             isIncome ? "text-success" : "text-danger"
@@ -68,46 +106,56 @@ function TransactionForm({ type, onAddTransaction, onBack }) {
             className={`fas ${
               isIncome ? "fa-plus-circle" : "fa-minus-circle"
             } me-2`}
-          ></i>
-
-          {isIncome ? "Registrar Ingreso" : "Registrar Gasto"}
+            aria-hidden="true"
+          />
+          {isIncome ? "Registrar ingreso" : "Registrar gasto"}
         </h3>
 
-        <form onSubmit={handleSubmit}>
+        <form onSubmit={handleSubmit} noValidate>
+          {/* Muestra los errores de validación. */}
+          {error && (
+            <div className="alert alert-danger" role="alert">
+              {error}
+            </div>
+          )}
 
-          {/* Descripción */}
+          {/* Descripción del movimiento. */}
           <div className="mb-3">
-            <label className="form-label fw-semibold">
+            <label htmlFor="description" className="form-label fw-semibold">
               Descripción
             </label>
 
             <input
+              id="description"
               type="text"
               className="form-control"
               placeholder={
                 isIncome
-                  ? "Ej: Pago de salario"
-                  : "Ej: Compra de supermercado"
+                  ? "Ej.: Pago de salario"
+                  : "Ej.: Compra de supermercado"
               }
               value={description}
-              onChange={(e) => setDescription(e.target.value)}
+              maxLength={100}
+              autoComplete="off"
+              onChange={(event) => setDescription(event.target.value)}
+              required
             />
           </div>
 
-          {/* Categoría */}
+          {/* Categoría del movimiento. */}
           <div className="mb-3">
-            <label className="form-label fw-semibold">
+            <label htmlFor="category" className="form-label fw-semibold">
               Categoría
             </label>
 
             <select
+              id="category"
               className="form-select"
               value={category}
-              onChange={(e) => setCategory(e.target.value)}
+              onChange={(event) => setCategory(event.target.value)}
+              required
             >
-              <option value="">
-                Selecciona una categoría
-              </option>
+              <option value="">Selecciona una categoría</option>
 
               {categories.map((item) => (
                 <option key={item} value={item}>
@@ -117,51 +165,55 @@ function TransactionForm({ type, onAddTransaction, onBack }) {
             </select>
           </div>
 
-          {/* Valor */}
+          {/* Importe del ingreso o gasto. */}
           <div className="mb-3">
-            <label className="form-label fw-semibold">
-              Valor
+            <label htmlFor="amount" className="form-label fw-semibold">
+              Valor (COP)
             </label>
 
             <div className="input-group">
               <span className="input-group-text">$</span>
 
               <input
+                id="amount"
                 type="number"
                 className="form-control"
                 placeholder="0"
                 min="1"
+                step="1"
                 value={amount}
-                onChange={(e) => setAmount(e.target.value)}
+                onChange={(event) => setAmount(event.target.value)}
+                required
               />
             </div>
           </div>
 
-          {/* Fecha */}
+          {/* Fecha en la que ocurrió el movimiento. */}
           <div className="mb-4">
-            <label className="form-label fw-semibold">
+            <label htmlFor="date" className="form-label fw-semibold">
               Fecha
             </label>
 
             <input
+              id="date"
               type="date"
               className="form-control"
               value={date}
-              onChange={(e) => setDate(e.target.value)}
+              onChange={(event) => setDate(event.target.value)}
+              required
             />
           </div>
 
-          {/* Botones */}
-          <div className="d-flex gap-2">
-
+          {/* Acciones disponibles para el usuario. */}
+          <div className="d-flex flex-wrap gap-2">
             <button
               type="submit"
               className={`btn ${
                 isIncome ? "btn-success" : "btn-danger"
               }`}
             >
-              <i className="fas fa-save me-2"></i>
-              Guardar {isIncome ? "Ingreso" : "Gasto"}
+              <i className="fas fa-save me-2" aria-hidden="true" />
+              Guardar {isIncome ? "ingreso" : "gasto"}
             </button>
 
             <button
@@ -169,12 +221,10 @@ function TransactionForm({ type, onAddTransaction, onBack }) {
               className="btn btn-outline-secondary"
               onClick={onBack}
             >
-              <i className="fas fa-arrow-left me-2"></i>
+              <i className="fas fa-arrow-left me-2" aria-hidden="true" />
               Cancelar
             </button>
-
           </div>
-
         </form>
       </div>
     </div>

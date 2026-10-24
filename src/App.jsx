@@ -27,16 +27,13 @@ function App() {
     return (
       <Register
         onBack={() => setView("login")}
+        onRegistered={() => setView("login")}
       />
     );
   }
 
   if (view === "forgot") {
-    return (
-      <ForgotPassword
-        onBack={() => setView("login")}
-      />
-    );
+    return <ForgotPassword onBack={() => setView("login")} />;
   }
 
   return (
